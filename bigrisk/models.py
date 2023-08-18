@@ -18,7 +18,7 @@ doc = """
 Tail, no median lottery project
 """
 
-
+portion = lambda x: float(1-1/(x+1))
 class Constants(BaseConstants):
     name_in_url = "bigrisk"
     players_per_group = None
@@ -32,20 +32,23 @@ class Constants(BaseConstants):
     with open(f"{path_to_data}lotteries.csv", "r") as f:
         reader = csv.DictReader(f)
         lotteries = [i.get("header") for i in reader]
-
-    with open(f"{path_to_data}tickets.csv", "r") as f:
-        reader = csv.DictReader(f)
-        tickets = list(reader)
-        tickets = [
-            {**i, "formatted_portion": f"{float(i.get('portion')):.2%}"}
-            for i in tickets
-        ]
+    num_tickets=range(1,30)
+    
+    
+    tickets = [
+        {"n":i, "formatted_portion": f"{portion(i):.3%}"}
+        for i in num_tickets
+    ]
+    pprint(tickets)
     with open(f"{path_to_data}heavytail.csv", "r") as f:
         tails = [float(line.strip()) for line in f.readlines()]
 
 
 class Subsession(BaseSubsession):
     def creating_session(self):
+        if self.round_number == 1:
+            for p in self.session.get_participants():
+                p.vars['chosen_round']=random.randint(1,Constants.num_rounds)
         neg = self.session.config.get("negative")
         tail = self.session.config.get("tail")
         endowment = (
@@ -56,6 +59,7 @@ class Subsession(BaseSubsession):
         else:
             lotteries = Constants.lotteries.copy()[:4]
         for p in self.get_players():
+            p.chosen_round=p.participant.vars['chosen_round']
             p.endowment = endowment
             p.tail = tail
             p.participant.vars["lotteries"] = lotteries
@@ -73,6 +77,9 @@ class Group(BaseGroup):
 
 
 class Player(BasePlayer):
+    def set_final_payoff(self):
+        self.payoff = self.in_round(self.chosen_round).intermediary_payoff
+
     def get_proportion(self):
         t = self.chosen_num_tickets
         prop = t / (t + 1)
@@ -90,6 +97,7 @@ class Player(BasePlayer):
         ],
         widget=widgets.RadioSelect,
     )
+    chosen_round = models.IntegerField()
     num_tickets_1 = models.IntegerField(min=0, max=20)
     num_tickets_2 = models.IntegerField(min=0, max=20)
     num_tickets_3 = models.IntegerField(min=0, max=20)
@@ -106,8 +114,8 @@ class Player(BasePlayer):
     chosen_num_tickets = models.IntegerField()
     tail = models.BooleanField()
     personal_outcome = models.FloatField()
-    intermediary_payoff=models.CurrencyField()
-    
+    intermediary_payoff = models.CurrencyField()
+
     # comprehension questions block
 
     # END OF comprehension questions block
